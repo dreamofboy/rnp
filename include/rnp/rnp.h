@@ -92,6 +92,7 @@ int rnp_encrypt_file(rnp_ctx_t *, const char *, const char *, const char *);
 int rnp_decrypt_file(rnp_ctx_t *, const char *, const char *);
 int rnp_sign_file(rnp_ctx_t *, const char *, const char *, const char *, bool, bool);
 int rnp_verify_file(rnp_ctx_t *, const char *, const char *, int);
+int rnp_process_stream(rnp_ctx_t *, const char *, const char *);
 
 /* memory signing and encryption */
 int rnp_sign_memory(rnp_ctx_t *, const char *, const char *, size_t, char *, size_t, bool);
