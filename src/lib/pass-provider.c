@@ -101,18 +101,25 @@ rnp_passphrase_provider_stdin(const pgp_passphrase_ctx_t *ctx,
     if (!ctx || !passphrase || !passphrase_size) {
         goto done;
     }
-    if (!pgp_keyid(keyid, PGP_KEY_ID_SIZE, ctx->pubkey)) {
-        goto done;
+
+    if (ctx->op != PGP_OP_DECRYPT_SYM) {
+        if (!pgp_keyid(keyid, PGP_KEY_ID_SIZE, ctx->pubkey)) {
+            goto done;
+        }
+        rnp_strhexdump(keyidhex, keyid, PGP_KEY_ID_SIZE, "");
+        snprintf(target,
+                sizeof(target),
+                "%s%s 0x%s",
+                ctx->op == PGP_OP_GENERATE_KEY ? "new " : "",
+                pgp_is_primary_key_tag(ctx->key_type) ? "primary key" : "subkey",
+                keyidhex);
     }
-    rnp_strhexdump(keyidhex, keyid, PGP_KEY_ID_SIZE, "");
-    snprintf(target,
-             sizeof(target),
-             "%s%s 0x%s",
-             ctx->op == PGP_OP_GENERATE_KEY ? "new " : "",
-             pgp_is_primary_key_tag(ctx->key_type) ? "primary key" : "subkey",
-             keyidhex);
 start:
-    snprintf(prompt, sizeof(prompt), "Enter passphrase for %s: ", target);
+    if (ctx->op != PGP_OP_DECRYPT_SYM) {
+        snprintf(prompt, sizeof(prompt), "Enter passphrase for %s: ", target);
+    } else {
+        snprintf(prompt, sizeof(prompt), "Enter passphrase to decrypt data: ");
+    }
     if (!rnp_getpass(prompt, passphrase, passphrase_size)) {
         goto done;
     }

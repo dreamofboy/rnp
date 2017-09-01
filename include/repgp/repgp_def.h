@@ -434,7 +434,8 @@ typedef enum pgp_op_t {
     PGP_OP_GENERATE_KEY = 1,
     PGP_OP_SIGN = 2,
     PGP_OP_DECRYPT = 3,
-    PGP_OP_UNLOCK = 4
+    PGP_OP_UNLOCK = 4,
+    PGP_OP_DECRYPT_SYM = 5
 } pgp_op_t;
 
 /** Hashing Algorithm Numbers.
