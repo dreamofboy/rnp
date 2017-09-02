@@ -38,7 +38,6 @@
 #include <stdbool.h>
 
 #include "memory.h"
-#include "pgp-key.h"
 
 typedef struct rnp_t rnp_t;
 
@@ -127,6 +126,7 @@ enum key_store_format_t {
 // combinated keystores
 #define RNP_KEYSTORE_GPG21 "GPG21" /* KBX + G10 keystore format */
 
+struct pgp_key_t;
 typedef struct rnp_key_store_t {
     const char *            path;
     const char *            format_label;
