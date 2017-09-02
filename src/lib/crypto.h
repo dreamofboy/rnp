@@ -104,7 +104,7 @@ bool pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
  *         subkey, must not be NULL
  *  @param subkey_sec pointer to store the generated secret key, must not be NULL
  *  @param subkey_pub pointer to store the generated public key, must not be NULL
- *  @param passphrase_provider the passphrase provider that will be used to
+ *  @param pass_provider the passphrase provider that will be used to
  *         decrypt the primary key, may be NULL if primary key is unlocked
  *  @return true if successful, false otherwise.
  **/
@@ -114,7 +114,7 @@ bool pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
                          pgp_key_t *                      primary_pub,
                          pgp_key_t *                      subkey_sec,
                          pgp_key_t *                      subkey_pub,
-                         const pgp_passphrase_provider_t *passphrase_provider);
+                         const pgp_passphrase_provider_t *pass_provider);
 
 /** generate a new primary key and subkey
  *
@@ -195,7 +195,7 @@ struct pgp_reader_t {
 struct pgp_cryptinfo_t {
     rnp_key_store_t *         secring;
     const pgp_key_t *         key;
-    pgp_passphrase_provider_t passphrase_provider;
+    pgp_passphrase_provider_t pass_provider;
     rnp_key_store_t *         pubring;
 };
 

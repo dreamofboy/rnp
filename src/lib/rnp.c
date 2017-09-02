@@ -627,20 +627,20 @@ rnp_init(rnp_t *rnp, const rnp_params_t *params)
     io = rnp->io;
 
     // set the default passphrase provider
-    rnp->passphrase_provider.callback = rnp_passphrase_provider_stdin;
-    rnp->passphrase_provider.userdata = NULL;
+    rnp->pass_provider.callback = rnp_passphrase_provider_stdin;
+    rnp->pass_provider.userdata = NULL;
 
     // setup file/pipe password input if requested
     if (params->passfd >= 0) {
         if (!set_pass_fd(rnp, params->passfd)) {
             return RNP_FAIL;
         }
-        rnp->passphrase_provider.callback = rnp_passphrase_provider_file;
-        rnp->passphrase_provider.userdata = rnp->passfp;
+        rnp->pass_provider.callback = rnp_passphrase_provider_file;
+        rnp->pass_provider.userdata = rnp->passfp;
     }
 
-    if (params->passphrase_provider.callback) {
-        rnp->passphrase_provider = params->passphrase_provider;
+    if (params->pass_provider.callback) {
+        rnp->pass_provider = params->pass_provider;
     }
 
     if (params->userinputfd >= 0) {
@@ -948,7 +948,7 @@ rnp_export_key(rnp_t *rnp, const char *name)
     if ((key = resolve_userid(rnp, rnp->pubring, name)) == NULL) {
         return NULL;
     }
-    return pgp_export_key(io, key, &rnp->passphrase_provider);
+    return pgp_export_key(io, key, &rnp->pass_provider);
 }
 
 #define IMPORT_ARMOR_HEAD "-----BEGIN PGP PUBLIC KEY BLOCK-----"
@@ -1115,7 +1115,7 @@ rnp_decrypt_file(rnp_ctx_t *ctx, const char *f, const char *out)
                             ctx->overwrite,
                             sshkeys,
                             ctx->rnp->pswdtries,
-                            &ctx->rnp->passphrase_provider);
+                            &ctx->rnp->pass_provider);
 }
 
 /* sign a file */
@@ -1178,7 +1178,7 @@ rnp_sign_file(rnp_ctx_t * ctx,
             if (pgp_key_is_locked(keypair)) {
                 decrypted_seckey =
                   pgp_decrypt_seckey(keypair,
-                                     &ctx->rnp->passphrase_provider,
+                                     &ctx->rnp->pass_provider,
                                      &(pgp_passphrase_ctx_t){.op = PGP_OP_SIGN,
                                                              .pubkey = pgp_get_pubkey(keypair),
                                                              .key_type = keypair->type});
@@ -1313,7 +1313,7 @@ rnp_sign_memory(rnp_ctx_t * ctx,
             if (pgp_key_is_locked(keypair)) {
                 decrypted_seckey =
                   pgp_decrypt_seckey(keypair,
-                                     &ctx->rnp->passphrase_provider,
+                                     &ctx->rnp->pass_provider,
                                      &(pgp_passphrase_ctx_t){.op = PGP_OP_SIGN,
                                                              .pubkey = pgp_get_pubkey(keypair),
                                                              .key_type = keypair->type});
@@ -1494,7 +1494,7 @@ rnp_decrypt_memory(
                           realarmour,
                           sshkeys,
                           attempts,
-                          &ctx->rnp->passphrase_provider);
+                          &ctx->rnp->pass_provider);
     if (mem == NULL) {
         return -1;
     }
@@ -1526,7 +1526,7 @@ rnp_list_packets(rnp_t *rnp, char *f, int armor)
         return RNP_FAIL;
     }
     ret = pgp_list_packets(
-      io, f, (unsigned) armor, rnp->secring, rnp->pubring, &rnp->passphrase_provider);
+      io, f, (unsigned) armor, rnp->secring, rnp->pubring, &rnp->pass_provider);
     return ret;
 }
 

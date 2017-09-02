@@ -416,7 +416,7 @@ pgp_decrypt_seckey_parser(const pgp_key_t *key, const char *passphrase)
 */
 pgp_seckey_t *
 pgp_decrypt_seckey(const pgp_key_t *                key,
-                   const pgp_passphrase_provider_t *provider,
+                   const pgp_passphrase_provider_t *pass_provider,
                    const pgp_passphrase_ctx_t *     ctx)
 {
     pgp_seckey_t *        decrypted_seckey = NULL;
@@ -424,7 +424,7 @@ pgp_decrypt_seckey(const pgp_key_t *                key,
     char                  passphrase[MAX_PASSPHRASE_LENGTH] = {0};
 
     // sanity checks
-    if (!key || !pgp_is_key_secret(key) || !provider) {
+    if (!key || !pgp_is_key_secret(key) || !pass_provider) {
         RNP_LOG("invalid args");
         goto done;
     }
@@ -441,7 +441,7 @@ pgp_decrypt_seckey(const pgp_key_t *                key,
     }
 
     // ask the provider for a passphrase
-    if (!pgp_request_passphrase(provider, ctx, passphrase, sizeof(passphrase))) {
+    if (!pgp_request_passphrase(pass_provider, ctx, passphrase, sizeof(passphrase))) {
         goto done;
     }
     // attempt to decrypt with the provided passphrase
@@ -625,7 +625,7 @@ pgp_key_init(pgp_key_t *key, const pgp_content_enum type)
 char *
 pgp_export_key(pgp_io_t *                       io,
                const pgp_key_t *                key,
-               const pgp_passphrase_provider_t *passphrase_provider)
+               const pgp_passphrase_provider_t *pass_provider)
 {
     pgp_output_t *output;
     pgp_memory_t *mem;
@@ -707,12 +707,12 @@ pgp_key_is_locked(const pgp_key_t *key)
 }
 
 bool
-pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *provider)
+pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *pass_provider)
 {
     pgp_seckey_t *decrypted_seckey = NULL;
 
     // sanity checks
-    if (!key || !provider) {
+    if (!key || !pass_provider) {
         return false;
     }
 
@@ -723,7 +723,7 @@ pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *provider)
 
     decrypted_seckey = pgp_decrypt_seckey(
       key,
-      provider,
+      pass_provider,
       &(pgp_passphrase_ctx_t){
         .op = PGP_OP_UNLOCK, .pubkey = pgp_get_pubkey(key), .key_type = key->type});
 

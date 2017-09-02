@@ -1734,7 +1734,7 @@ pgp_list_packets(pgp_io_t *                       io,
                  unsigned                         armour,
                  rnp_key_store_t *                secring,
                  rnp_key_store_t *                pubring,
-                 const pgp_passphrase_provider_t *passphrase_provider)
+                 const pgp_passphrase_provider_t *pass_provider)
 {
     pgp_stream_t * stream = NULL;
     const unsigned accumulate = 1;
@@ -1745,7 +1745,7 @@ pgp_list_packets(pgp_io_t *                       io,
     pgp_parse_options(stream, PGP_PTAG_SS_ALL, PGP_PARSE_PARSED);
     stream->cryptinfo.secring = secring;
     stream->cryptinfo.pubring = pubring;
-    stream->cryptinfo.passphrase_provider = *passphrase_provider;
+    stream->cryptinfo.pass_provider = *pass_provider;
     if (armour) {
         pgp_reader_push_dearmour(stream);
     }

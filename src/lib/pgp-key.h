@@ -142,7 +142,7 @@ pgp_key_flags_t pgp_pk_alg_capabilities(pgp_pubkey_alg_t alg);
 char *pgp_export_key(pgp_io_t *, const pgp_key_t *, const pgp_passphrase_provider_t *);
 
 bool pgp_key_is_locked(const pgp_key_t *key);
-bool pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *provider);
+bool pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *pass_provider);
 void pgp_key_lock(pgp_key_t *key);
 
 #endif // RNP_PACKET_KEY_H

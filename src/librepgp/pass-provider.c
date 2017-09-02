@@ -26,13 +26,14 @@
 #include <repgp/repgp.h>
 
 bool
-pgp_request_passphrase(const pgp_passphrase_provider_t *provider,
+pgp_request_passphrase(const pgp_passphrase_provider_t *pass_provider,
                        const pgp_passphrase_ctx_t *     ctx,
                        char *                           passphrase,
                        size_t                           passphrase_size)
 {
-    if (!provider || !provider->callback || !ctx || !passphrase || !passphrase_size) {
+    if (!pass_provider || !pass_provider->callback || !ctx || !passphrase ||
+        !passphrase_size) {
         return false;
     }
-    return provider->callback(ctx, passphrase, passphrase_size, provider->userdata);
+    return pass_provider->callback(ctx, passphrase, passphrase_size, pass_provider->userdata);
 }

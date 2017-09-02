@@ -205,7 +205,7 @@ typedef struct pgp_passphrase_provider_t {
     void *                     userdata;
 } pgp_passphrase_provider_t;
 
-bool pgp_request_passphrase(const pgp_passphrase_provider_t *provider,
+bool pgp_request_passphrase(const pgp_passphrase_provider_t *pass_provider,
                             const pgp_passphrase_ctx_t *     ctx,
                             char *                           passphrase,
                             size_t                           passphrase_size);
