@@ -567,7 +567,7 @@ parse_seckey(pgp_seckey_t *seckey, s_exp_t *s_exp, pgp_pubkey_alg_t alg, bool ha
 }
 
 static pgp_seckey_t *
-g10_decrypt_seckey(const pgp_key_t *key, const char *passphrase)
+g10_decrypt_seckey(const pgp_memory_t *mem, const char *passphrase)
 {
     uint8_t            derived_key[PGP_MAX_KEY_SIZE];
     unsigned           keysize;

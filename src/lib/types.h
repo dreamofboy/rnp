@@ -55,6 +55,7 @@
 #include <rnp/rnp_def.h>
 #include "defs.h"
 #include "errors.h"
+#include "memory.h"
 #include "crypto/rsa.h"
 #include "crypto/dsa.h"
 #include "crypto/elgamal.h"
@@ -169,9 +170,8 @@ unsigned pgp_is_hash_alg_supported(const pgp_hash_alg_t *);
 typedef struct pgp_key_t pgp_key_t;
 
 struct pgp_seckey_t;
-
-typedef struct pgp_seckey_t *pgp_seckey_decrypt_t(const pgp_key_t *key,
-                                                  const char *     passphrase);
+typedef struct pgp_seckey_t *pgp_seckey_decrypt_t(const pgp_memory_t *mem,
+                                                  const char *        passphrase);
 
 /** pgp_seckey_t
  */

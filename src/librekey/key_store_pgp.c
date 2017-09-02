@@ -126,7 +126,7 @@ cb_keyring_read(const pgp_packet_t *pkt, pgp_cbdata_t *cbinfo)
     case PGP_PTAG_CT_PUBLIC_SUBKEY:
         if (pgp_is_secret_key_tag(pkt->tag)) {
             keydata.seckey = content->seckey;
-            keydata.seckey.decrypt_cb = pgp_decrypt_seckey_parser;
+            keydata.seckey.decrypt_cb = pgp_decrypt_seckey_pgp;
         } else {
             keydata.pubkey = content->pubkey;
         }

@@ -53,6 +53,7 @@
 #include "signature.h"
 #include "utils.h"
 #include <rnp/rnp_sdk.h>
+#include <librepgp/reader.h>
 #include "readerwriter.h"
 #include "validate.h"
 #include "misc.h"
@@ -317,7 +318,6 @@ pgp_get_writable_seckey(pgp_key_t *key)
 
 typedef struct {
     const char *     passphrase;
-    const pgp_key_t *key;
     pgp_seckey_t *   seckey;
 } decrypt_t;
 
@@ -383,26 +383,21 @@ decrypt_cb(const pgp_packet_t *pkt, pgp_cbdata_t *cbinfo)
 }
 
 pgp_seckey_t *
-pgp_decrypt_seckey_parser(const pgp_key_t *key, const char *passphrase)
+pgp_decrypt_seckey_pgp(const pgp_memory_t *mem, const char *passphrase)
 {
-    pgp_stream_t *stream;
+    pgp_stream_t *stream = NULL;
     const int     printerrors = 1;
     decrypt_t     decrypt = {0};
 
-    if (!key->packetc || !key->packets) {
-        RNP_LOG("can not decrypt secret key without raw packets");
-        return NULL;
-    }
-
     decrypt.passphrase = passphrase;
-    decrypt.key = key;
     stream = pgp_new(sizeof(*stream));
-    if (!pgp_key_reader_set(stream, key)) {
-        return NULL;
+    if (!pgp_reader_set_memory(stream, pgp_mem_data(mem), pgp_mem_len(mem))) {
+        goto done;
     }
     pgp_set_callback(stream, decrypt_cb, &decrypt);
     stream->readinfo.accumulate = 1;
     pgp_parse(stream, !printerrors);
+done:
     pgp_stream_delete(stream);
     return decrypt.seckey;
 }
@@ -421,6 +416,7 @@ pgp_decrypt_seckey(const pgp_key_t *                key,
 {
     pgp_seckey_t *        decrypted_seckey = NULL;
     pgp_seckey_decrypt_t *decryptor = NULL;
+    pgp_memory_t          mem = {0};
     char                  passphrase[MAX_PASSPHRASE_LENGTH] = {0};
 
     // sanity checks
@@ -434,8 +430,12 @@ pgp_decrypt_seckey(const pgp_key_t *                key,
         goto done;
     }
 
+    // setup memory
+    mem.buf = key->packets[0].raw;
+    mem.length = key->packets[0].length;
+
     // try an empty passphrase first
-    decrypted_seckey = decryptor(key, "");
+    decrypted_seckey = decryptor(&mem, "");
     if (decrypted_seckey) {
         goto done;
     }
@@ -445,7 +445,7 @@ pgp_decrypt_seckey(const pgp_key_t *                key,
         goto done;
     }
     // attempt to decrypt with the provided passphrase
-    decrypted_seckey = decryptor(key, passphrase);
+    decrypted_seckey = decryptor(&mem, passphrase);
 
 done:
     pgp_forget(passphrase, sizeof(passphrase));

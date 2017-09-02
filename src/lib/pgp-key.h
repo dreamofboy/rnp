@@ -55,6 +55,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <repgp/repgp.h>
+#include "memory.h"
 #include "types.h"
 #include "defs.h"
 #include "symmetric.h"
@@ -117,7 +118,7 @@ const struct pgp_seckey_t *pgp_get_seckey(const pgp_key_t *);
 
 pgp_seckey_t *pgp_get_writable_seckey(pgp_key_t *);
 
-pgp_seckey_t *pgp_decrypt_seckey_parser(const pgp_key_t *, const char *);
+pgp_seckey_t *pgp_decrypt_seckey_pgp(const pgp_memory_t *, const char *);
 
 pgp_seckey_t *pgp_decrypt_seckey(const pgp_key_t *,
                                  const pgp_passphrase_provider_t *,
