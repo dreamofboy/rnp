@@ -197,7 +197,7 @@ rnp_key_store_load_from_file(rnp_t *rnp, rnp_key_store_t *key_store, const unsig
             }
 
             // G10 may don't read one file, so, ignore it!
-            if (!rnp_key_store_g10_from_mem(rnp->io, key_store, &mem)) {
+            if (!rnp_key_store_g10_from_mem(rnp->io, rnp->pubring, key_store, &mem)) {
                 fprintf(rnp->io->errs, "Can't parse file: %s\n", path);
             }
             pgp_memory_release(&mem);
@@ -229,7 +229,7 @@ rnp_key_store_load_from_mem(rnp_t *          rnp,
         return rnp_key_store_kbx_from_mem(rnp->io, key_store, memory);
 
     case G10_KEY_STORE:
-        return rnp_key_store_g10_from_mem(rnp->io, key_store, memory);
+        return rnp_key_store_g10_from_mem(rnp->io, rnp->pubring, key_store, memory);
 
     default:
         fprintf(rnp->io->errs,
@@ -655,7 +655,7 @@ rnp_key_store_get_key_by_id(pgp_io_t *             io,
                             pgp_pubkey_t **        pubkey)
 {
     if (rnp_get_debug(__FILE__)) {
-        fprintf(io->errs, "looking keyring %p\n", keyring);
+        fprintf(io->errs, "searching keyring %p\n", keyring);
     }
 
     for (; keyring && *from < keyring->keyc; *from += 1) {
@@ -676,30 +676,25 @@ rnp_key_store_get_key_by_id(pgp_io_t *             io,
     return NULL;
 }
 
-bool
+pgp_key_t *
 rnp_key_store_get_key_by_grip(pgp_io_t *             io,
-                              const rnp_key_store_t *keyring,
-                              const uint8_t *        grip,
-                              pgp_pubkey_t **        pubkey)
+                              rnp_key_store_t *keyring,
+                              const uint8_t *        grip)
 {
     if (rnp_get_debug(__FILE__)) {
         fprintf(io->errs, "looking keyring %p\n", keyring);
     }
 
-    *pubkey = NULL;
     for (int i = 0; keyring && i < keyring->keyc; i++) {
         if (rnp_get_debug(__FILE__)) {
             hexdump(io->errs, "looking for grip", grip, PGP_FINGERPRINT_SIZE);
             hexdump(io->errs, "keyring grip", keyring->keys[i].grip, PGP_FINGERPRINT_SIZE);
         }
         if (memcmp(keyring->keys[i].grip, grip, PGP_FINGERPRINT_SIZE) == 0) {
-            if (pubkey) {
-                *pubkey = &keyring->keys[i].key.pubkey;
-            }
-            return true;
+            return &keyring->keys[i];
         }
     }
-    return false;
+    return NULL;
 }
 
 /* convert a string keyid into a binary keyid */

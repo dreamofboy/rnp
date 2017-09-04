@@ -47,7 +47,11 @@ static const pgp_compression_type_t DEFAULT_COMPRESS_ALGS[] = {
 
 /* Shortcut to load a single key from memory. */
 static bool
-load_generated_key(pgp_output_t **output, pgp_memory_t **mem, pgp_key_t *dst, key_store_format_t format)
+load_generated_key(pgp_output_t **    output,
+                   pgp_memory_t **    mem,
+                   pgp_key_t *        dst,
+                   key_store_format_t format,
+                   pgp_key_t *pubkey)
 {
     bool     ok = false;
     pgp_io_t io = {.errs = stderr, .res = stdout, .outs = stdout};
@@ -66,11 +70,15 @@ load_generated_key(pgp_output_t **output, pgp_memory_t **mem, pgp_key_t *dst, ke
             goto end;
         }
         break;
-    case G10_KEY_STORE:
-        if (!rnp_key_store_g10_from_mem(&io, key_store, *mem)) {
+    case G10_KEY_STORE: {
+        rnp_key_store_t *pubring = calloc(1, sizeof(*pubring));
+        rnp_key_store_add_key(&io, pubring, pubkey);
+        if (!rnp_key_store_g10_from_mem(&io, pubring, key_store, *mem)) {
             goto end;
         }
-        break;
+        rnp_key_store_remove_key(&io, pubring, &pubring->keys[0]);
+        rnp_key_store_free(pubring);
+    } break;
     default:
         RNP_LOG("invalid key format %d", format);
         break;
@@ -301,7 +309,7 @@ pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
                          bool                       merge_defaults,
                          pgp_key_t *                primary_sec,
                          pgp_key_t *                primary_pub,
-                         key_store_format_t secformat)
+                         key_store_format_t         secformat)
 {
     bool          ok = false;
     pgp_output_t *output = NULL;
@@ -334,21 +342,6 @@ pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
         goto end;
     }
 
-    // write the secret key, userid, and self-signature
-    if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
-        goto end;
-    }
-    if (!pgp_write_struct_seckey(output, PGP_PTAG_CT_SECRET_KEY, &seckey, NULL) ||
-        !pgp_write_struct_userid(output, desc->cert.userid) ||
-        !pgp_write_selfsig_cert(output, &seckey, desc->crypto.hash_alg, &desc->cert)) {
-        RNP_LOG("failed to write out generated key+sigs");
-        goto end;
-    }
-    // load the secret key back in
-    if (!load_generated_key(&output, &mem, primary_sec, secformat)) {
-        goto end;
-    }
-
     // write the public key, userid, and self-signature
     if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
         goto end;
@@ -360,7 +353,38 @@ pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
         goto end;
     }
     // load the public key back in
-    if (!load_generated_key(&output, &mem, primary_pub, false)) {
+    if (!load_generated_key(&output, &mem, primary_pub, GPG_KEY_STORE, NULL)) {
+        goto end;
+    }
+
+    // write the secret key, userid, and self-signature
+    if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
+        goto end;
+    }
+    switch (secformat) {
+    case GPG_KEY_STORE:
+    case KBX_KEY_STORE:
+        if (!pgp_write_struct_seckey(output, PGP_PTAG_CT_SECRET_KEY, &seckey, NULL) ||
+            !pgp_write_struct_userid(output, desc->cert.userid) ||
+            !pgp_write_selfsig_cert(output, &seckey, desc->crypto.hash_alg, &desc->cert)) {
+            RNP_LOG("failed to write out generated key+sigs");
+            goto end;
+        }
+        break;
+    case G10_KEY_STORE:
+        if (!g10_write_seckey(output, &seckey, NULL)) {
+            RNP_LOG("failed to write generated seckey");
+            goto end;
+        }
+        break;
+    default:
+        RNP_LOG("invalid format");
+        goto end;
+        break;
+    }
+    // load the secret key back in
+    if (!load_generated_key(&output, &mem, primary_sec, secformat, primary_pub)) {
+        RNP_LOG("failed to load back generated key");
         goto end;
     }
 
@@ -417,7 +441,7 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
                     pgp_key_t *                      subkey_sec,
                     pgp_key_t *                      subkey_pub,
                     const pgp_passphrase_provider_t *pass_provider,
-                    key_store_format_t secformat)
+                    key_store_format_t               secformat)
 {
     bool                ok = false;
     pgp_output_t *      output = NULL;
@@ -482,22 +506,6 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
         goto end;
     }
 
-    // write the secret subkey, userid, and binding self-signature
-    if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
-        goto end;
-    }
-    if (!pgp_write_struct_seckey(output, PGP_PTAG_CT_SECRET_SUBKEY, &seckey, NULL) ||
-        !pgp_write_selfsig_binding(
-          output, primary_seckey, desc->crypto.hash_alg, &seckey.pubkey, &desc->binding)) {
-        RNP_LOG("failed to write out generated key+sigs");
-        goto end;
-    }
-    // load the secret key back in
-    if (!load_generated_key(&output, &mem, subkey_sec, secformat)) {
-        goto end;
-    }
-    primary_sec->subkeys[primary_sec->subkeyc++] = subkey_sec;
-
     // write the public subkey, userid, and binding self-signature
     if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
         goto end;
@@ -509,10 +517,41 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
         goto end;
     }
     // load the public key back in
-    if (!load_generated_key(&output, &mem, subkey_pub, false)) {
+    if (!load_generated_key(&output, &mem, subkey_pub, GPG_KEY_STORE, NULL)) {
         goto end;
     }
     primary_pub->subkeys[primary_pub->subkeyc++] = subkey_pub;
+
+    // write the secret subkey, userid, and binding self-signature
+    if (!pgp_setup_memory_write(NULL, &output, &mem, 4096)) {
+        goto end;
+    }
+    switch (secformat) {
+    case GPG_KEY_STORE:
+    case KBX_KEY_STORE:
+        if (!pgp_write_struct_seckey(output, PGP_PTAG_CT_SECRET_SUBKEY, &seckey, NULL) ||
+            !pgp_write_selfsig_binding(
+              output, primary_seckey, desc->crypto.hash_alg, &seckey.pubkey, &desc->binding)) {
+            RNP_LOG("failed to write out generated key+sigs");
+            goto end;
+        }
+        break;
+    case G10_KEY_STORE:
+        if (!g10_write_seckey(output, &seckey, NULL)) {
+            RNP_LOG("failed to write generated seckey");
+            goto end;
+        }
+        break;
+    default:
+        RNP_LOG("invalid format");
+        goto end;
+        break;
+    }
+    // load the secret key back in
+    if (!load_generated_key(&output, &mem, subkey_sec, secformat, subkey_pub)) {
+        goto end;
+    }
+    primary_sec->subkeys[primary_sec->subkeyc++] = subkey_sec;
 
     ok = true;
 end:
@@ -595,7 +634,8 @@ pgp_generate_keypair(rnp_keygen_desc_t *desc,
     }
 
     // generate the primary key
-    if (!pgp_generate_primary_key(&desc->primary, merge_defaults, primary_sec, primary_pub, secformat)) {
+    if (!pgp_generate_primary_key(
+          &desc->primary, merge_defaults, primary_sec, primary_pub, secformat)) {
         RNP_LOG("failed to generate primary key");
         goto end;
     }

@@ -32,7 +32,10 @@
 
 bool rnp_key_store_g10_from_mem(pgp_io_t *,
                                 rnp_key_store_t *,
+                                rnp_key_store_t *,
                                 pgp_memory_t *);
 bool rnp_key_store_g10_key_to_mem(pgp_io_t *, pgp_key_t *, const uint8_t *, pgp_memory_t *);
+bool
+g10_write_seckey(pgp_output_t *output, pgp_seckey_t *seckey, const char *passphrase);
 
 #endif // RNP_KEY_STORE_G10_H

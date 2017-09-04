@@ -1135,7 +1135,6 @@ rnp_sign_file(rnp_ctx_t * ctx,
     int                 attempts;
     int                 ret;
     int                 i;
-    unsigned            from;
 
     io = ctx->rnp->io;
     if (f == NULL) {
@@ -1144,6 +1143,7 @@ rnp_sign_file(rnp_ctx_t * ctx,
     }
     /* get key with which to sign */
     if ((keypair = resolve_userid(ctx->rnp, ctx->rnp->pubring, userid)) == NULL) {
+        RNP_LOG("unable to locate key %s", userid);
         return RNP_FAIL;
     }
     if (!pgp_key_can_sign(keypair) &&
@@ -1152,9 +1152,8 @@ rnp_sign_file(rnp_ctx_t * ctx,
         return RNP_FAIL;
     }
     // key exist and might be used to sign, trying get it from secring
-    from = 0;
-    if ((keypair = rnp_key_store_get_key_by_id(
-           io, ctx->rnp->secring, keypair->keyid, &from, NULL)) == NULL) {
+    if ((keypair = rnp_key_store_get_key_by_grip(
+           io, ctx->rnp->secring, keypair->grip)) == NULL) {
         return RNP_FAIL;
     }
     ret = RNP_OK;

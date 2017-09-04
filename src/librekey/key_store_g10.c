@@ -420,10 +420,7 @@ static bool
 parse_pubkey(pgp_pubkey_t *pubkey, s_exp_t *s_exp, pgp_pubkey_alg_t alg)
 {
     pubkey->version = PGP_V4;
-    pubkey->birthtime = time(NULL);
-    pubkey->duration = 0;
     pubkey->alg = alg;
-
     switch (alg) {
     case PGP_PKA_DSA:
         pubkey->key.dsa.p = read_bignum(s_exp, "p");
@@ -500,12 +497,6 @@ parse_pubkey(pgp_pubkey_t *pubkey, s_exp_t *s_exp, pgp_pubkey_alg_t alg)
 static bool
 parse_seckey(pgp_seckey_t *seckey, s_exp_t *s_exp, pgp_pubkey_alg_t alg, bool has_header)
 {
-    if (seckey->pubkey.version != PGP_V2 && seckey->pubkey.version != PGP_V3 &&
-        seckey->pubkey.version != PGP_V4) {
-        fprintf(stderr, "You should run parse_seckey only after parse_pubkey\n");
-        return false;
-    }
-
     if (!has_header) {
         seckey->s2k_usage = PGP_S2KU_NONE;
         seckey->alg = PGP_SA_PLAINTEXT;
@@ -746,6 +737,7 @@ g10_decrypt_seckey(const pgp_memory_t *mem, const char *passphrase)
 
     return seckey;
 #endif
+    return NULL;
 }
 
 static bool
@@ -870,11 +862,12 @@ parse_protected_seckey(pgp_seckey_t *seckey, s_exp_t *s_exp)
 }
 
 bool
-rnp_key_store_g10_from_mem(pgp_io_t *io, rnp_key_store_t *key_store, pgp_memory_t *memory)
+rnp_key_store_g10_from_mem(pgp_io_t *io, rnp_key_store_t *pubring, rnp_key_store_t *key_store, pgp_memory_t *memory)
 {
     s_exp_t     s_exp = {0};
     size_t      length = memory->length;
     const char *bytes = (const char *) memory->buf;
+    pgp_key_t * key = NULL;
     bool        ret = false;
 
     if (rnp_get_debug(__FILE__)) {
@@ -985,15 +978,31 @@ rnp_key_store_g10_from_mem(pgp_io_t *io, rnp_key_store_t *key_store, pgp_memory_
     pgp_keydata_key_t keydata = {0};
 
     if (!parse_pubkey(&keydata.pubkey, algorithm_s_exp, alg)) {
+        RNP_LOG("failed to parse pubkey");
         goto done;
+    }
+
+    if (pubring) {
+        uint8_t       grip[PGP_FINGERPRINT_SIZE];
+        pgp_key_t *pubkey = NULL;
+        if (!rnp_key_store_get_key_grip(&keydata.pubkey, grip)) {
+          goto done;
+        }
+        if ((pubkey = rnp_key_store_get_key_by_grip(io, pubring, grip))) {
+            pgp_pubkey_t tmp = keydata.seckey.pubkey;
+            keydata.seckey.pubkey = *pgp_get_pubkey(pubkey);
+            keydata.seckey.pubkey.key = tmp.key;
+        }
     }
 
     if (protected) {
         if (!parse_protected_seckey(&keydata.seckey, algorithm_s_exp)) {
+            RNP_LOG("failed to parse protected seckey");
             goto done;
         }
     } else {
         if (!parse_seckey(&keydata.seckey, algorithm_s_exp, alg, false)) {
+            RNP_LOG("failed to parse seckey");
             goto done;
         }
     }
@@ -1008,7 +1017,6 @@ rnp_key_store_g10_from_mem(pgp_io_t *io, rnp_key_store_t *key_store, pgp_memory_
         }
     }
 
-    pgp_key_t *key = NULL;
     if (!rnp_key_store_add_keydata(io, key_store, &keydata, &key, PGP_PTAG_CT_SECRET_KEY)) {
         goto done;
     }
@@ -1020,10 +1028,15 @@ rnp_key_store_g10_from_mem(pgp_io_t *io, rnp_key_store_t *key_store, pgp_memory_
     if (!key->packets) {
         goto done;
     }
-    // take ownership
-    key->packets[0].raw = memory->buf;
+    key->packets[0].raw = calloc(1, memory->length);
     key->packets[0].length = memory->length;
+    memcpy(key->packets[0].raw, memory->buf, memory->length);
+    key->packetc++;
     memset(memory, 0, sizeof(*memory));
+    key->format = G10_KEY_STORE;
+    key->is_protected = protected;
+    ret = true;
+
 done:
     destroy_s_exp(&s_exp);
     if (!ret) {
@@ -1447,11 +1460,11 @@ g10_write_seckey(pgp_output_t *output, pgp_seckey_t *seckey, const char *passphr
     switch (seckey->s2k_usage) {
     case PGP_S2KU_NONE:
       protected
-        = true;
+        = false;
         break;
     case PGP_S2KU_ENCRYPTED_AND_HASHED:
       protected
-        = false;
+        = true;
         break;
     default:
         RNP_LOG("unsupported s2k usage");
