@@ -57,6 +57,7 @@
 #include "readerwriter.h"
 #include "validate.h"
 #include "misc.h"
+#include "crypto/s2k.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -391,7 +392,7 @@ pgp_decrypt_seckey_pgp(const pgp_memory_t *mem, const char *passphrase)
 
     decrypt.passphrase = passphrase;
     stream = pgp_new(sizeof(*stream));
-    if (!pgp_reader_set_memory(stream, pgp_mem_data(mem), pgp_mem_len(mem))) {
+    if (!pgp_reader_set_memory(stream, mem->buf, pgp_mem_len(mem))) {
         goto done;
     }
     pgp_set_callback(stream, decrypt_cb, &decrypt);
@@ -715,6 +716,10 @@ pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *pass_provider)
     if (!key || !pass_provider) {
         return false;
     }
+    if (!pgp_is_key_secret(key)) {
+        RNP_LOG("key is not a secret key");
+        return false;
+    }
 
     // see if it's already unlocked
     if (!pgp_key_is_locked(key)) {
@@ -755,6 +760,11 @@ pgp_key_lock(pgp_key_t *key)
         RNP_LOG("invalid args");
         return;
     }
+    if (!pgp_key_is_protected(key)) {
+        // locking an unprotected key doesn't
+        // really make sense
+        return;
+    }
 
     // see if it's already locked
     if (pgp_key_is_locked(key)) {
@@ -763,4 +773,69 @@ pgp_key_lock(pgp_key_t *key)
 
     pgp_seckey_free_secret_mpis(&key->key.seckey);
     key->key.seckey.encrypted = true;
+}
+
+bool
+pgp_key_protect(pgp_key_t *key, key_store_format_t format, const pgp_passphrase_provider_t *pass_provider)
+{
+    bool ret = false;
+    char passphrase[MAX_PASSPHRASE_LENGTH] = {0};
+
+    // sanity check
+    if (!pgp_is_key_secret(key)) {
+        RNP_LOG("Warning: this is not a secret key");
+        goto done;
+    }
+    if (pgp_key_is_locked(key)) {
+        RNP_LOG("Key must be unlocked to (re)protect");
+        goto done;
+    }
+
+    // ask the provider for a passphrase
+    if (!pgp_request_passphrase(pass_provider,
+                                &(pgp_passphrase_ctx_t){.op = PGP_OP_PROTECT,
+                                                        .pubkey = pgp_get_pubkey(key),
+                                                        .key_type = key->type},
+                                passphrase,
+                                sizeof(passphrase))) {
+        goto done;
+    }
+    pgp_seckey_t *seckey = &key->key.seckey;
+    seckey->s2k_usage = PGP_S2KU_ENCRYPTED_AND_HASHED;
+    seckey->s2k_specifier = PGP_S2KS_ITERATED_AND_SALTED;
+    seckey->s2k_iterations = pgp_s2k_round_iterations(65536);
+    seckey->alg = PGP_SA_DEFAULT_CIPHER;
+    seckey->cipher_mode = PGP_SA_DEFAULT_CIPHER_MODE;
+    // TODO...
+    ret = true;
+
+done:
+    pgp_forget(passphrase, sizeof(passphrase));
+    return ret;
+}
+
+bool
+pgp_key_unprotect(pgp_key_t *key, const pgp_passphrase_provider_t *pass_provider)
+{
+    bool ret = false;
+
+    // sanity check
+    if (!pgp_is_key_secret(key)) {
+        RNP_LOG("Warning: this is not a secret key");
+        goto done;
+    }
+    //if unlocked, just write the packet
+    //if locked, use decrypt_cb, then write the packet
+    ret = true;
+
+done:
+    return ret;
+}
+
+bool pgp_key_is_protected(const pgp_key_t *key) {
+    // sanity check
+    if (!pgp_is_key_secret(key)) {
+        RNP_LOG("Warning: this is not a secret key");
+    }
+    return key->is_protected;
 }

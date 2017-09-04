@@ -197,7 +197,7 @@ rnp_key_store_load_from_file(rnp_t *rnp, rnp_key_store_t *key_store, const unsig
             }
 
             // G10 may don't read one file, so, ignore it!
-            if (!rnp_key_store_g10_from_mem(rnp->io, rnp->pubring, key_store, &mem)) {
+            if (!rnp_key_store_g10_from_mem(rnp->io, key_store, &mem)) {
                 fprintf(rnp->io->errs, "Can't parse file: %s\n", path);
             }
             pgp_memory_release(&mem);
@@ -229,7 +229,7 @@ rnp_key_store_load_from_mem(rnp_t *          rnp,
         return rnp_key_store_kbx_from_mem(rnp->io, key_store, memory);
 
     case G10_KEY_STORE:
-        return rnp_key_store_g10_from_mem(rnp->io, rnp->pubring, key_store, memory);
+        return rnp_key_store_g10_from_mem(rnp->io, key_store, memory);
 
     default:
         fprintf(rnp->io->errs,

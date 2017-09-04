@@ -53,6 +53,7 @@
 
 #include <stdint.h>
 #include <rnp/rnp_def.h>
+#include "memory.h"
 #include "defs.h"
 #include "errors.h"
 #include "memory.h"

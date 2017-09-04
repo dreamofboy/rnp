@@ -26,8 +26,9 @@
 #include <stdint.h>
 
 #include <rekey/rnp_key_store.h>
-
 #include <librekey/key_store_pgp.h>
+#include <librekey/key_store_g10.h>
+
 #include <librepgp/packet-show.h>
 #include <librepgp/packet-parse.h>
 
@@ -46,7 +47,7 @@ static const pgp_compression_type_t DEFAULT_COMPRESS_ALGS[] = {
 
 /* Shortcut to load a single key from memory. */
 static bool
-load_generated_key(pgp_output_t **output, pgp_memory_t **mem, pgp_key_t *dst)
+load_generated_key(pgp_output_t **output, pgp_memory_t **mem, pgp_key_t *dst, key_store_format_t format)
 {
     bool     ok = false;
     pgp_io_t io = {.errs = stderr, .res = stdout, .outs = stdout};
@@ -57,8 +58,24 @@ load_generated_key(pgp_output_t **output, pgp_memory_t **mem, pgp_key_t *dst)
     if (!key_store) {
         return false;
     }
-    if (!rnp_key_store_pgp_read_from_mem(&io, key_store, 0, *mem) || key_store->keyc != 1) {
-        RNP_LOG("failed to read back generated key");
+    switch (format) {
+    case GPG_KEY_STORE:
+    case KBX_KEY_STORE:
+        if (!rnp_key_store_pgp_read_from_mem(&io, key_store, 0, *mem)) {
+            RNP_LOG("failed to read back generated key");
+            goto end;
+        }
+        break;
+    case G10_KEY_STORE:
+        if (!rnp_key_store_g10_from_mem(&io, key_store, *mem)) {
+            goto end;
+        }
+        break;
+    default:
+        RNP_LOG("invalid key format %d", format);
+        break;
+    }
+    if (key_store->keyc != 1) {
         goto end;
     }
     memcpy(dst, &key_store->keys[0], sizeof(*dst));
@@ -283,7 +300,8 @@ bool
 pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
                          bool                       merge_defaults,
                          pgp_key_t *                primary_sec,
-                         pgp_key_t *                primary_pub)
+                         pgp_key_t *                primary_pub,
+                         key_store_format_t secformat)
 {
     bool          ok = false;
     pgp_output_t *output = NULL;
@@ -327,7 +345,7 @@ pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
         goto end;
     }
     // load the secret key back in
-    if (!load_generated_key(&output, &mem, primary_sec)) {
+    if (!load_generated_key(&output, &mem, primary_sec, secformat)) {
         goto end;
     }
 
@@ -342,7 +360,7 @@ pgp_generate_primary_key(rnp_keygen_primary_desc_t *desc,
         goto end;
     }
     // load the public key back in
-    if (!load_generated_key(&output, &mem, primary_pub)) {
+    if (!load_generated_key(&output, &mem, primary_pub, false)) {
         goto end;
     }
 
@@ -398,7 +416,8 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
                     pgp_key_t *                      primary_pub,
                     pgp_key_t *                      subkey_sec,
                     pgp_key_t *                      subkey_pub,
-                    const pgp_passphrase_provider_t *pass_provider)
+                    const pgp_passphrase_provider_t *pass_provider,
+                    key_store_format_t secformat)
 {
     bool                ok = false;
     pgp_output_t *      output = NULL;
@@ -474,7 +493,7 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
         goto end;
     }
     // load the secret key back in
-    if (!load_generated_key(&output, &mem, subkey_sec)) {
+    if (!load_generated_key(&output, &mem, subkey_sec, secformat)) {
         goto end;
     }
     primary_sec->subkeys[primary_sec->subkeyc++] = subkey_sec;
@@ -490,7 +509,7 @@ pgp_generate_subkey(rnp_keygen_subkey_desc_t *       desc,
         goto end;
     }
     // load the public key back in
-    if (!load_generated_key(&output, &mem, subkey_pub)) {
+    if (!load_generated_key(&output, &mem, subkey_pub, false)) {
         goto end;
     }
     primary_pub->subkeys[primary_pub->subkeyc++] = subkey_pub;
@@ -554,7 +573,8 @@ pgp_generate_keypair(rnp_keygen_desc_t *desc,
                      pgp_key_t *        primary_sec,
                      pgp_key_t *        primary_pub,
                      pgp_key_t *        subkey_sec,
-                     pgp_key_t *        subkey_pub)
+                     pgp_key_t *        subkey_pub,
+                     key_store_format_t secformat)
 {
     bool ok = false;
 
@@ -575,7 +595,7 @@ pgp_generate_keypair(rnp_keygen_desc_t *desc,
     }
 
     // generate the primary key
-    if (!pgp_generate_primary_key(&desc->primary, merge_defaults, primary_sec, primary_pub)) {
+    if (!pgp_generate_primary_key(&desc->primary, merge_defaults, primary_sec, primary_pub, secformat)) {
         RNP_LOG("failed to generate primary key");
         goto end;
     }
@@ -587,7 +607,8 @@ pgp_generate_keypair(rnp_keygen_desc_t *desc,
                              primary_pub,
                              subkey_sec,
                              subkey_pub,
-                             NULL)) {
+                             NULL,
+                             secformat)) {
         RNP_LOG("failed to generate subkey");
         goto end;
     }

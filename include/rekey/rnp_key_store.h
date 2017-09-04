@@ -110,13 +110,13 @@ typedef struct {
     uint32_t blob_created_at;
 } kbx_pgp_blob_t;
 
-enum key_store_format_t {
+typedef enum key_store_format_t {
     UNKNOW_KEY_STORE = 0,
     GPG_KEY_STORE,
     SSH_KEY_STORE,
     KBX_KEY_STORE,
     G10_KEY_STORE,
-};
+} key_store_format_t;
 
 #define RNP_KEYSTORE_GPG "GPG" /* GPG keystore format */
 #define RNP_KEYSTORE_KBX "KBX" /* KBX keystore format */

@@ -1019,7 +1019,7 @@ rnp_generate_key(rnp_t *rnp)
     if (!primary_sec || !primary_pub || !subkey_sec || !subkey_pub) {
         goto end;
     }
-    if (!pgp_generate_keypair(desc, true, primary_sec, primary_pub, subkey_sec, subkey_pub)) {
+    if (!pgp_generate_keypair(desc, true, primary_sec, primary_pub, subkey_sec, subkey_pub, ((rnp_key_store_t*)rnp->secring)->format)) {
         RNP_LOG("failed to generate keys");
         goto end;
     }

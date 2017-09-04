@@ -55,6 +55,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <repgp/repgp.h>
+#include <rekey/rnp_key_store.h>
 #include "memory.h"
 #include "types.h"
 #include "defs.h"
@@ -76,6 +77,10 @@ struct pgp_key_t {
     uint32_t          uid0;       /* primary uid index in uids array */
     uint8_t           revoked;    /* key has been revoked */
     pgp_revoke_t      revocation; /* revocation reason */
+
+    // these are only valid for secret keys
+    key_store_format_t format; /* the format of the key in packets[0] */
+    bool is_protected; /* whether the key in packets[0] is encrypted */
 };
 
 struct pgp_key_t *pgp_key_new(void);
@@ -142,8 +147,35 @@ pgp_key_flags_t pgp_pk_alg_capabilities(pgp_pubkey_alg_t alg);
 
 char *pgp_export_key(pgp_io_t *, const pgp_key_t *, const pgp_passphrase_provider_t *);
 
+bool pgp_key_is_protected(const pgp_key_t *key);
+
+/** check if a key is currently locked
+ *
+ *  Note: Key locking does not apply to unprotected keys.
+ *
+ *  @param key the key
+ *  @return true if the key is locked, false otherwise
+ **/
 bool pgp_key_is_locked(const pgp_key_t *key);
+
+/** unlock a key
+ *
+ *  Note: Key locking does not apply to unprotected keys.
+ *
+ *  @param key the key
+ *  @param pass_provider the passphrase provider that may be used
+ *         to unlock the key, if necessary
+ *  @return true if the key was unlocked, false otherwise
+ **/
 bool pgp_key_unlock(pgp_key_t *key, const pgp_passphrase_provider_t *pass_provider);
+
+/** lock a key
+ *
+ *  Note: Key locking does not apply to unprotected keys.
+ *
+ *  @param key the key
+ *  @return true if the key was unlocked, false otherwise
+ **/
 void pgp_key_lock(pgp_key_t *key);
 
 #endif // RNP_PACKET_KEY_H
